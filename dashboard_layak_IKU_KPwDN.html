@@ -1,0 +1,348 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Layak IKU per KPwDN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --paper:#f2f2ee; --panel:#eef0eb; --panel-strong:#e2e6df; --ink:#33414a; --muted:#607184;
+      --sage:#87937e; --sage-soft:#a9b5a0; --steel:#5b7388; --gold:#d2ad68; --track:#d8dddc; --white:#fbfbf8;
+    }
+    * { box-sizing:border-box; }
+    body { font-family:'Poppins',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
+    body::before { content:""; position:fixed; inset:auto -10% -28% auto; width:58vw; height:58vw; border-radius:50%; background:rgba(203,207,198,.45); z-index:-2; }
+    body::after { content:""; position:fixed; right:-10%; top:0; width:34vw; height:24vw; background:rgba(136,147,126,.22); clip-path:polygon(24% 0,100% 0,100% 100%,0 64%); z-index:-1; }
+    .glass-card { background:rgba(255,255,255,.46); border:1px solid rgba(126,139,124,.18); box-shadow:0 18px 46px rgba(63,78,86,.08); }
+    .soft-panel { background:rgba(226,230,223,.62); border:1px solid rgba(126,139,124,.14); }
+    .metric { font-variant-numeric:tabular-nums; }
+    .chart-box { position:relative; height:322px; }
+    .chart-small { position:relative; height:260px; }
+    .bar-track { height:24px; border-radius:999px; background:var(--track); overflow:hidden; }
+    .bar-fill { height:100%; border-radius:999px; transition:width .25s ease; }
+    .insight { color:var(--muted); line-height:1.58; }
+    .title-dot { width:28px; height:28px; border-radius:50%; background:var(--gold); display:inline-block; flex:none; }
+    select, input { color-scheme:light; }
+    th { position:sticky; top:0; background:#e4e8e1; z-index:1; }
+    .table-wrap { max-height:340px; overflow:auto; }
+    .hidden-until-data { opacity:.38; pointer-events:none; }
+    @media (max-width:768px) { .chart-box { height:280px; } .chart-small { height:230px; } }
+  </style>
+</head>
+<body class="overflow-x-hidden">
+  <header class="sticky top-0 z-50 px-6 md:px-10 py-4 bg-[#f2f2ee]/90 backdrop-blur-md border-b border-[#dfe3dc]">
+    <div class="max-w-[1500px] mx-auto flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+      <div class="flex items-start gap-4">
+        <span class="title-dot mt-1"></span>
+        <div>
+          <h1 class="text-2xl md:text-3xl font-extrabold tracking-[.18em] text-[#7f8b7d] leading-tight">INDEKS LAYAK IKU</h1>
+          <p class="text-xs md:text-sm font-bold tracking-[.32em] text-[#7f8b7d]">Template Dashboard Berbasis Upload Excel</p>
+        </div>
+      </div>
+      <div class="flex flex-col lg:flex-row gap-3 lg:items-center">
+        <label class="inline-flex items-center justify-center cursor-pointer bg-[#d2ad68] text-white font-bold rounded-lg px-4 py-2.5 text-sm shadow-sm hover:brightness-95">
+          Upload Excel
+          <input id="excelInput" type="file" accept=".xlsx,.xls" class="hidden">
+        </label>
+        <div id="loadStatus" class="text-xs text-[#607184] min-w-[220px]">Mencoba memuat layak_IKU.xlsx...</div>
+        <label class="text-xs font-bold uppercase tracking-widest text-[#7f8b7d]" for="kpwdnSelect">Filter Area</label>
+        <select id="kpwdnSelect" class="min-w-[280px] bg-[#fbfbf8] border border-[#cfd6cd] rounded-lg px-4 py-2.5 text-sm text-[#33414a] focus:outline-none focus:ring-2 focus:ring-[#d2ad68]" disabled></select>
+      </div>
+    </div>
+  </header>
+
+  <main id="dashboardRoot" class="px-6 md:px-10 py-8 max-w-[1500px] mx-auto hidden-until-data">
+    <section class="glass-card rounded-3xl p-7 md:p-9 mb-6 relative overflow-hidden">
+      <div class="absolute right-[-8rem] top-[-8rem] w-[34rem] h-[34rem] rounded-full bg-[#dfe4df]/70 pointer-events-none"></div>
+      <div class="relative grid grid-cols-1 xl:grid-cols-[1.15fr_.85fr] gap-8 items-start">
+        <div>
+          <div class="text-xs font-bold tracking-[.2em] text-[#d2ad68] uppercase mb-3">Dashboard Interaktif</div>
+          <h2 class="text-3xl md:text-5xl font-extrabold text-[#33414a] leading-tight" id="areaTitle">-</h2>
+          <p class="mt-4 text-[#526b83] max-w-5xl leading-relaxed" id="headlineInsight">Upload file Excel untuk menampilkan dashboard.</p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-7">
+            <div class="soft-panel rounded-2xl p-4"><div class="text-xs text-[#7f8b7d] font-bold uppercase">Ranking</div><div class="text-3xl font-black metric text-[#33414a]" id="rankCard">-</div></div>
+            <div class="soft-panel rounded-2xl p-4"><div class="text-xs text-[#7f8b7d] font-bold uppercase">IKU Total</div><div class="text-3xl font-black metric text-[#5b7388]" id="ikuCard">-</div></div>
+            <div class="soft-panel rounded-2xl p-4"><div class="text-xs text-[#7f8b7d] font-bold uppercase">Persepsi</div><div class="text-3xl font-black metric text-[#87937e]" id="persepsiCard">-</div></div>
+            <div class="soft-panel rounded-2xl p-4"><div class="text-xs text-[#7f8b7d] font-bold uppercase">Ideal</div><div class="text-3xl font-black metric text-[#d2ad68]" id="idealCard">-</div></div>
+          </div>
+        </div>
+        <div class="soft-panel rounded-2xl p-6">
+          <div class="text-sm font-extrabold text-[#33414a] mb-3">Insight <span id="insightAreaLabel">Area Terpilih</span></div>
+          <div id="autoNarrative" class="space-y-3 text-sm insight"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="glass-card rounded-2xl p-6"><div class="text-xs font-bold text-[#7f8b7d] uppercase tracking-wider">Total</div><div class="text-5xl font-extrabold metric text-[#5b7388] mt-3" id="kpiTotal">-</div><div class="text-sm text-[#607184] mt-2">IKU Total</div><div class="mt-4 text-xs text-[#7f8b7d]" id="metaTotal">-</div></div>
+      <div class="glass-card rounded-2xl p-6"><div class="text-xs font-bold text-[#7f8b7d] uppercase tracking-wider">Rumah Tangga</div><div class="text-5xl font-extrabold metric text-[#87937e] mt-3" id="kpiRuta">-</div><div class="text-sm text-[#607184] mt-2">IKU Ruta</div><div class="mt-4 text-xs text-[#7f8b7d]" id="metaRuta">-</div></div>
+      <div class="glass-card rounded-2xl p-6"><div class="text-xs font-bold text-[#7f8b7d] uppercase tracking-wider">UMKM</div><div class="text-5xl font-extrabold metric text-[#d2ad68] mt-3" id="kpiUmkm">-</div><div class="text-sm text-[#607184] mt-2">IKU UMKM</div><div class="mt-4 text-xs text-[#7f8b7d]" id="metaUmkm">-</div></div>
+    </section>
+
+    <section class="grid grid-cols-1 xl:grid-cols-[.82fr_1.18fr] gap-6 mb-6">
+      <div class="glass-card rounded-2xl p-6">
+        <div class="mb-5"><div class="text-xs font-bold text-[#d2ad68] uppercase tracking-wider">Benchmark Utama</div><h3 class="text-xl font-extrabold text-[#33414a] mt-1">Nasional vs Wilayah 3T vs <span id="benchmarkAreaTitle">Area Terpilih</span></h3></div>
+        <div class="space-y-7" id="benchmarkBars"></div>
+        <div class="flex gap-5 text-xs text-[#607184] mt-7"><span><i class="inline-block w-4 h-4 rounded-full bg-[#5b7388] align-middle mr-2"></i>Nasional</span><span><i class="inline-block w-4 h-4 rounded-full bg-[#87937e] align-middle mr-2"></i>Wilayah 3T</span><span><i class="inline-block w-4 h-4 rounded-full bg-[#d2ad68] align-middle mr-2"></i><span id="selectedLegendLabel">Terpilih</span></span></div>
+        <p class="insight text-sm mt-5" id="benchmarkInsight">-</p>
+      </div>
+      <div class="glass-card rounded-2xl p-6"><div class="mb-4"><div class="text-xs font-bold text-[#d2ad68] uppercase tracking-wider">Persepsi - IKU - Ideal</div><h3 class="text-xl font-extrabold text-[#33414a] mt-1">Total, Rumah Tangga, dan UMKM</h3></div><div class="chart-box"><canvas id="mainChart"></canvas></div><p class="insight text-sm mt-4" id="mainInsight">-</p></div>
+    </section>
+
+    <section class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+      <div class="glass-card rounded-2xl p-6"><div class="mb-4"><div class="text-xs font-bold text-[#d2ad68] uppercase tracking-wider">UPB / UPK / Total</div><h3 class="text-xl font-extrabold text-[#33414a] mt-1">Profil IKU Utama</h3></div><div class="chart-box"><canvas id="radarChart"></canvas></div><p class="insight text-sm mt-4" id="radarInsight">-</p></div>
+      <div class="glass-card rounded-2xl p-6"><div class="mb-4"><div class="text-xs font-bold text-[#d2ad68] uppercase tracking-wider">Pecahan Rupiah</div><h3 class="text-xl font-extrabold text-[#33414a] mt-1">Persepsi Layak, IKU, dan Ideal per Pecahan</h3></div><div class="chart-box"><canvas id="denomChart"></canvas></div><p class="insight text-sm mt-4" id="denomInsight">-</p></div>
+    </section>
+
+    <section class="grid grid-cols-1 xl:grid-cols-[.85fr_1.15fr] gap-6 mb-6">
+      <div class="glass-card rounded-2xl p-6"><div class="mb-4"><div class="text-xs font-bold text-[#d2ad68] uppercase tracking-wider">Posisi KPwDN</div><h3 class="text-xl font-extrabold text-[#33414a] mt-1">Ranking terhadap Seluruh KPwDN</h3></div><div class="chart-small"><canvas id="rankChart"></canvas></div><p class="insight text-sm mt-4" id="rankInsight">-</p></div>
+      <div class="glass-card rounded-2xl p-6"><div class="mb-4"><div class="text-xs font-bold text-[#d2ad68] uppercase tracking-wider">Tabel Detail</div><h3 class="text-xl font-extrabold text-[#33414a] mt-1">Ringkasan Angka Terpilih</h3></div><div class="table-wrap rounded-xl border border-[#d5dbd3]"><table class="w-full text-sm"><thead><tr class="text-left text-[#607184]"><th class="p-3">Panel</th><th class="p-3">Persepsi Total</th><th class="p-3">IKU Total</th><th class="p-3">Ideal Total</th><th class="p-3">IKU UPB</th><th class="p-3">IKU UPK</th></tr></thead><tbody id="detailRows" class="divide-y divide-[#d8ded7]"></tbody></table></div></div>
+    </section>
+  </main>
+
+  <script>
+    const T3_LIST = ['Biak', 'Kolaka', 'Putussibau', 'Merauke', 'Waikabubak', 'Nunukan', 'Alor', 'Takengon', 'Tobelo'];
+    const DENOMS = ['100rb','50rb','20rb','10rb','5rb','2rb','1rb'];
+    const KEEP = [
+      'Segmen','Persepsi UPB','Persepsi UPK','Persepsi Total','Ideal UPB','Ideal UPK','Ideal Total','IKU UPB','IKU UPK','IKU Total',
+      'Persepsi Layak 100rb','Persepsi Layak 50rb','Persepsi Layak 20rb','Persepsi Layak 10rb','Persepsi Layak 5rb','Persepsi Layak 2rb','Persepsi Layak 1rb',
+      'Ideal 100rb','Ideal 50rb','Ideal 20rb','Ideal 10rb','Ideal 5rb','Ideal 2rb','Ideal 1rb',
+      'IKU 100rb','IKU 50rb','IKU 20rb','IKU 10rb','IKU 5rb','IKU 2rb','IKU 1rb'
+    ];
+    const fmt = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const f = v => typeof v === 'number' && Number.isFinite(v) ? fmt.format(v) : '-';
+    const signed = v => typeof v === 'number' && Number.isFinite(v) ? (v >= 0 ? '+' : '') + f(v) : '-';
+    const metricItems = ['UPB', 'UPK', ...DENOMS];
+    const panelNames = { total:'Total', ruta:'Rumah Tangga', umkm:'UMKM' };
+    const colors = { nasional:'#5b7388', t3:'#87937e', selected:'#d2ad68', sage:'#a9b5a0', muted:'#d8dddc', ink:'#33414a' };
+    let DATA = null;
+    let charts = {};
+    Chart.defaults.color = '#607184';
+    Chart.defaults.font.family = "'Poppins', sans-serif";
+
+    function setStatus(text) { document.getElementById('loadStatus').textContent = text; }
+    function cleanCell(v) {
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'number') return Number.isFinite(v) ? v : '';
+      return String(v).trim();
+    }
+    function parseSheet(ws) {
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true })
+        .map(row => row.map(cleanCell))
+        .filter(row => row.some(v => v !== ''));
+      if (!rows.length) return [];
+      const headers = ['Kategori', 'Segmen', ...rows[0].slice(2).map(v => String(v || '').trim())];
+      const records = [];
+      let group = '';
+      rows.slice(1).forEach(row => {
+        if (row[0] !== '') group = String(row[0]);
+        const label = row[1] === undefined ? '' : String(row[1]).trim();
+        if (!label) return;
+        const rec = { Kategori: group, Segmen: label };
+        headers.slice(2).forEach((h, i) => {
+          if (!h) return;
+          const raw = row[i + 2];
+          rec[h] = typeof raw === 'number' ? raw : (raw === '' ? '' : Number(raw));
+          if (Number.isNaN(rec[h])) rec[h] = raw;
+        });
+        records.push(rec);
+      });
+      return records;
+    }
+    function compact(rec, label) {
+      const out = {};
+      KEEP.forEach(k => out[k] = rec?.[k] ?? '');
+      out.Segmen = label || rec?.Segmen || '';
+      return out;
+    }
+    function averageRecords(records, label) {
+      const avg = { Segmen: label };
+      KEEP.forEach(key => {
+        if (key === 'Segmen') return;
+        const vals = records.map(r => r[key]).filter(v => typeof v === 'number' && Number.isFinite(v));
+        avg[key] = vals.length ? vals.reduce((a,b)=>a+b,0) / vals.length : '';
+      });
+      return avg;
+    }
+    function findRecord(records, label) {
+      return records.find(r => String(r.Segmen || '').trim().toLowerCase() === label.toLowerCase()) || {};
+    }
+    function buildData(workbook) {
+      const sheetByName = {};
+      workbook.SheetNames.forEach(name => sheetByName[name.trim().toLowerCase()] = workbook.Sheets[name]);
+      ['total','ruta','umkm'].forEach(name => { if (!sheetByName[name]) throw new Error(`Sheet ${name} tidak ditemukan.`); });
+      const raw = { total: parseSheet(sheetByName.total), ruta: parseSheet(sheetByName.ruta), umkm: parseSheet(sheetByName.umkm) };
+      const maps = {};
+      ['total','ruta','umkm'].forEach(sheet => {
+        maps[sheet] = Object.fromEntries(raw[sheet].filter(r => r.Kategori === 'KPwDN').map(r => [r.Segmen, r]));
+      });
+      const kpwdnLabels = Object.keys(maps.total).sort((a,b) => a.localeCompare(b, 'id'));
+      const records = {};
+      kpwdnLabels.forEach(label => {
+        records[label] = { kind:'KPwDN', total: compact(maps.total[label], label), ruta: compact(maps.ruta[label], label), umkm: compact(maps.umkm[label], label) };
+      });
+      records.Nasional = {
+        kind:'Agregat',
+        total: compact(findRecord(raw.total, 'Nasional'), 'Nasional'),
+        ruta: compact(findRecord(raw.ruta, 'Nasional'), 'Nasional'),
+        umkm: compact(findRecord(raw.umkm, 'Nasional'), 'Nasional')
+      };
+      ['total','ruta','umkm'].forEach(sheet => {
+        const missing = T3_LIST.filter(label => !maps[sheet][label]);
+        if (missing.length) throw new Error(`Data 3T tidak lengkap pada sheet ${sheet}: ${missing.join(', ')}`);
+      });
+      records['Wilayah 3T'] = {
+        kind:'Agregat 3T',
+        total: compact(averageRecords(T3_LIST.map(label => maps.total[label]), 'Wilayah 3T'), 'Wilayah 3T'),
+        ruta: compact(averageRecords(T3_LIST.map(label => maps.ruta[label]), 'Wilayah 3T'), 'Wilayah 3T'),
+        umkm: compact(averageRecords(T3_LIST.map(label => maps.umkm[label]), 'Wilayah 3T'), 'Wilayah 3T')
+      };
+      const ranking = kpwdnLabels
+        .map(label => ({ label, iku: records[label].total['IKU Total'] }))
+        .filter(x => typeof x.iku === 'number')
+        .sort((a,b) => b.iku - a.iku)
+        .map((x, i) => ({ ...x, rank: i + 1 }));
+      const rankMap = Object.fromEntries(ranking.map(x => [x.label, x.rank]));
+      return { labels:['Nasional','Wilayah 3T',...kpwdnLabels], kpwdnLabels, records, ranking, rankMap, t3List:T3_LIST, denoms:DENOMS };
+    }
+    function val(rec, key) { return typeof rec?.[key] === 'number' ? rec[key] : null; }
+    function displayLabel(label) { return label === 'Wilayah 3T' ? 'Wilayah 3T' : label; }
+    function tooltipLabel(ctx) {
+      const label = ctx.dataset?.label ? ctx.dataset.label + ': ' : '';
+      return label + f(ctx.parsed?.y ?? ctx.parsed?.r ?? ctx.raw);
+    }
+    function metricKey(kind, metric) {
+      if (metric === 'UPB' || metric === 'UPK') return `${kind} ${metric}`;
+      if (kind === 'Persepsi') return `Persepsi Layak ${metric}`;
+      return `${kind} ${metric}`;
+    }
+    function metricRows(rec, kind='IKU') {
+      return metricItems.map(metric => ({ label:metric, value:val(rec, metricKey(kind, metric)) })).filter(x => x.value !== null);
+    }
+    function weakest(rec) { return metricRows(rec, 'IKU').sort((a,b)=>a.value-b.value)[0]; }
+    function strongest(rec) { return metricRows(rec, 'IKU').sort((a,b)=>b.value-a.value)[0]; }
+    function destroyCharts() { Object.values(charts).forEach(chart => chart.destroy()); charts = {}; }
+    function baseOptions(min=0, max=12) {
+      return { responsive:true, maintainAspectRatio:false, scales:{ y:{ min, max, grid:{ color:'rgba(96,113,132,.14)' }, ticks:{ callback:v=>f(v) } }, x:{ grid:{ display:false } } }, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:14, color:'#607184' } }, tooltip:{ callbacks:{ label: tooltipLabel } } } };
+    }
+    function setupOptions(defaultLabel='Nasional') {
+      const select = document.getElementById('kpwdnSelect');
+      select.innerHTML = DATA.labels.map(label => `<option value="${label}">${label === 'Wilayah 3T' ? 'Wilayah 3T (Agregat)' : label}</option>`).join('');
+      select.disabled = false;
+      select.value = DATA.labels.includes(defaultLabel) ? defaultLabel : 'Nasional';
+      select.onchange = () => render(select.value);
+      render(select.value);
+      document.getElementById('dashboardRoot').classList.remove('hidden-until-data');
+    }
+    function render(label) {
+      destroyCharts();
+      const item = DATA.records[label];
+      const total = item.total, ruta = item.ruta, umkm = item.umkm;
+      const nasional = DATA.records.Nasional.total;
+      const t3 = DATA.records['Wilayah 3T'].total;
+      const totalIku = val(total, 'IKU Total');
+      const vsNat = totalIku - val(nasional, 'IKU Total');
+      const rank = DATA.rankMap[label];
+      const w = weakest(total), s = strongest(total);
+      const shownLabel = displayLabel(label);
+      document.getElementById('areaTitle').textContent = label === 'Wilayah 3T' ? 'Wilayah 3T (Agregat)' : label;
+      document.getElementById('benchmarkAreaTitle').textContent = shownLabel;
+      document.getElementById('selectedLegendLabel').textContent = shownLabel;
+      document.getElementById('insightAreaLabel').textContent = shownLabel;
+      document.getElementById('rankCard').textContent = rank ? `${rank} / ${DATA.kpwdnLabels.length}` : 'Agregat';
+      document.getElementById('ikuCard').textContent = f(totalIku);
+      document.getElementById('persepsiCard').textContent = f(val(total, 'Persepsi Total'));
+      document.getElementById('idealCard').textContent = f(val(total, 'Ideal Total'));
+      document.getElementById('kpiTotal').textContent = f(totalIku);
+      document.getElementById('kpiRuta').textContent = f(val(ruta, 'IKU Total'));
+      document.getElementById('kpiUmkm').textContent = f(val(umkm, 'IKU Total'));
+      document.getElementById('metaTotal').textContent = `Persepsi ${f(val(total,'Persepsi Total'))} | Ideal ${f(val(total,'Ideal Total'))}`;
+      document.getElementById('metaRuta').textContent = `Persepsi ${f(val(ruta,'Persepsi Total'))} | Ideal ${f(val(ruta,'Ideal Total'))}`;
+      document.getElementById('metaUmkm').textContent = `Persepsi ${f(val(umkm,'Persepsi Total'))} | Ideal ${f(val(umkm,'Ideal Total'))}`;
+      const areaText = label === 'Nasional' ? 'Seluruh data nasional' : label === 'Wilayah 3T' ? `Agregat 9 wilayah 3T: ${DATA.t3List.join(', ')}` : `KPwDN ${label}`;
+      document.getElementById('headlineInsight').textContent = `${areaText} menampilkan Persepsi Layak, IKU, Ideal, Rumah Tangga, dan UMKM. IKU Total berada di ${f(totalIku)} atau ${signed(vsNat)} poin terhadap nasional.`;
+      document.getElementById('autoNarrative').innerHTML = [
+        `<p><strong>Persepsi vs Ideal.</strong> Persepsi layak total ${f(val(total,'Persepsi Total'))}, sedangkan ideal ${f(val(total,'Ideal Total'))}. Ini menunjukkan jarak ekspektasi sebesar ${f(val(total,'Ideal Total') - val(total,'Persepsi Total'))} poin.</p>`,
+        `<p><strong>Ruta dan UMKM.</strong> Rumah Tangga mencatat IKU ${f(val(ruta,'IKU Total'))}, sementara UMKM ${f(val(umkm,'IKU Total'))}. Selisih Ruta-UMKM adalah ${signed(val(ruta,'IKU Total') - val(umkm,'IKU Total'))} poin.</p>`,
+        `<p><strong>Pecahan uang.</strong> Pecahan terkuat adalah ${s?.label || '-'} (${f(s?.value)}), sedangkan titik perhatian utama adalah ${w?.label || '-'} (${f(w?.value)}).</p>`
+      ].join('');
+      renderBenchmark(shownLabel, total, nasional, t3);
+      renderTable(item);
+      renderInsights(label, shownLabel, item, nasional, t3);
+      renderCharts(label, shownLabel, item, nasional, t3);
+    }
+    function renderBenchmark(shownLabel, selected, nasional, t3) {
+      const metrics = [{key:'IKU Total', title:'Total'}, {key:'IKU UPB', title:'UPB'}, {key:'IKU UPK', title:'UPK'}];
+      const max = Math.max(10, ...metrics.flatMap(m => [val(nasional,m.key), val(t3,m.key), val(selected,m.key)]).filter(x => x !== null));
+      document.getElementById('benchmarkBars').innerHTML = metrics.map(m => {
+        const rows = [['Nasional', val(nasional,m.key), colors.nasional], ['Wilayah 3T', val(t3,m.key), colors.t3], [shownLabel, val(selected,m.key), colors.selected]];
+        return `<div><div class="font-extrabold text-[#33414a] mb-2">${m.title}</div><div class="space-y-2">${rows.map(r => `<div class="grid grid-cols-[112px_1fr_52px] items-center gap-2 text-xs"><span class="text-[#607184] truncate" title="${r[0]}">${r[0]}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, r[1]/max*100)}%; background:${r[2]}"></div></div><span class="metric font-bold text-[#607184]">${f(r[1])}</span></div>`).join('')}</div></div>`;
+      }).join('');
+    }
+    function renderInsights(label, shownLabel, item, nasional, t3) {
+      const total = item.total, ruta = item.ruta, umkm = item.umkm;
+      const sel = val(total,'IKU Total'), nat = val(nasional,'IKU Total'), t3v = val(t3,'IKU Total');
+      document.getElementById('benchmarkInsight').textContent = label === 'Nasional'
+        ? `Nasional menjadi baseline pembanding utama. Wilayah 3T berada di ${f(t3v)} atau ${signed(t3v - nat)} poin dari nasional, sehingga jarak 3T menjadi sinyal pemerataan kualitas.`
+        : `${shownLabel} berada ${signed(sel - nat)} poin terhadap nasional dan ${signed(sel - t3v)} poin terhadap agregat Wilayah 3T. Selisih ini membantu menentukan apakah area tersebut perlu perlakuan prioritas atau cukup dipertahankan.`;
+      const panels = [{name:'Total', r:total}, {name:'Rumah Tangga', r:ruta}, {name:'UMKM', r:umkm}];
+      const bestPanel = [...panels].sort((a,b)=>val(b.r,'IKU Total')-val(a.r,'IKU Total'))[0];
+      const lowPanel = [...panels].sort((a,b)=>val(a.r,'IKU Total')-val(b.r,'IKU Total'))[0];
+      document.getElementById('mainInsight').textContent = `Panel terkuat adalah ${bestPanel.name} dengan IKU ${f(val(bestPanel.r,'IKU Total'))}, sedangkan panel terendah adalah ${lowPanel.name} dengan IKU ${f(val(lowPanel.r,'IKU Total'))}. Fokus evaluasi sebaiknya diarahkan pada panel terendah sambil menjaga gap menuju ideal.`;
+      const upb = val(total,'IKU UPB'), upk = val(total,'IKU UPK');
+      document.getElementById('radarInsight').textContent = `IKU UPB sebesar ${f(upb)} dan IKU UPK sebesar ${f(upk)}. Selisih UPB-UPK ${f(upb-upk)} poin menunjukkan pecahan kecil/UPK masih menjadi ruang peningkatan kualitas yang lebih besar.`;
+      const w = weakest(total), s = strongest(total);
+      document.getElementById('denomInsight').textContent = `Pada indikator pecahan ${shownLabel}, ${s?.label || '-'} menjadi titik IKU paling kuat (${f(s?.value)}), sedangkan ${w?.label || '-'} paling lemah (${f(w?.value)}). Grafik ini juga memperlihatkan apakah IKU sudah lebih dekat ke persepsi layak atau ke level ideal pada setiap pecahan.`;
+      const rank = DATA.rankMap[label];
+      document.getElementById('rankInsight').textContent = rank ? `${shownLabel} berada pada ranking ${rank} dari ${DATA.kpwdnLabels.length} KPwDN. Semakin dekat ke ranking 1, semakin kuat posisi IKU terhadap wilayah lain.` : `${shownLabel} adalah agregat pembanding sehingga tidak diberi ranking KPwDN. Gunakan grafik ini untuk melihat sebaran seluruh KPwDN dan posisi relatif nasional/3T melalui angka benchmark.`;
+    }
+    function renderTable(item) {
+      document.getElementById('detailRows').innerHTML = ['total','ruta','umkm'].map(key => {
+        const r = item[key];
+        return `<tr class="text-[#33414a]"><td class="p-3 font-bold">${panelNames[key]}</td><td class="p-3">${f(val(r,'Persepsi Total'))}</td><td class="p-3 font-extrabold text-[#5b7388]">${f(val(r,'IKU Total'))}</td><td class="p-3">${f(val(r,'Ideal Total'))}</td><td class="p-3">${f(val(r,'IKU UPB'))}</td><td class="p-3">${f(val(r,'IKU UPK'))}</td></tr>`;
+      }).join('');
+    }
+    function renderCharts(label, shownLabel, item, nasional, t3) {
+      const total = item.total, ruta = item.ruta, umkm = item.umkm;
+      charts.main = new Chart(document.getElementById('mainChart'), { type:'bar', data:{ labels:['Total','Rumah Tangga','UMKM'], datasets:[{ label:'Persepsi Layak', data:[val(total,'Persepsi Total'), val(ruta,'Persepsi Total'), val(umkm,'Persepsi Total')], backgroundColor:colors.sage, borderRadius:5 },{ label:'IKU', data:[val(total,'IKU Total'), val(ruta,'IKU Total'), val(umkm,'IKU Total')], backgroundColor:colors.nasional, borderRadius:5 },{ label:'Ideal', data:[val(total,'Ideal Total'), val(ruta,'Ideal Total'), val(umkm,'Ideal Total')], backgroundColor:colors.selected, borderRadius:5 }] }, options:baseOptions(0, 12) });
+      charts.radar = new Chart(document.getElementById('radarChart'), { type:'radar', data:{ labels:['UPB','UPK','Total'], datasets:[{ label:'Nasional', data:[val(nasional,'IKU UPB'),val(nasional,'IKU UPK'),val(nasional,'IKU Total')], borderColor:colors.nasional, backgroundColor:'rgba(91,115,136,.13)', borderWidth:2 },{ label:'Wilayah 3T', data:[val(t3,'IKU UPB'),val(t3,'IKU UPK'),val(t3,'IKU Total')], borderColor:colors.t3, backgroundColor:'rgba(135,147,126,.14)', borderWidth:2 },{ label:shownLabel, data:[val(total,'IKU UPB'),val(total,'IKU UPK'),val(total,'IKU Total')], borderColor:colors.selected, backgroundColor:'rgba(210,173,104,.18)', borderWidth:2 }] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ r:{ suggestedMin:0, suggestedMax:12, ticks:{ callback:v=>f(v) }, grid:{color:'rgba(96,113,132,.14)'}, angleLines:{color:'rgba(96,113,132,.14)'} } }, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,padding:14,color:'#607184'}}, tooltip:{ callbacks:{ label: tooltipLabel } } } } });
+      charts.denom = new Chart(document.getElementById('denomChart'), { type:'bar', data:{ labels:metricItems, datasets:[{ label:'Persepsi Layak', data:metricItems.map(m=>val(total, metricKey('Persepsi', m))), backgroundColor:colors.sage, borderRadius:5 },{ label:'IKU', data:metricItems.map(m=>val(total, metricKey('IKU', m))), backgroundColor:colors.nasional, borderRadius:5 },{ label:'Ideal', data:metricItems.map(m=>val(total, metricKey('Ideal', m))), backgroundColor:colors.selected, borderRadius:5 }] }, options:baseOptions(0, 12) });
+      const around = [...DATA.ranking].sort((a,b)=>a.rank-b.rank);
+      charts.rank = new Chart(document.getElementById('rankChart'), { type:'line', data:{ labels:around.map(x=>x.rank), datasets:[{ label:'IKU Total KPwDN', data:around.map(x=>x.iku), borderColor:'#aeb9ad', backgroundColor:'#aeb9ad', pointRadius:0, tension:.22 },{ label:shownLabel, data:around.map(x=>x.label===label?x.iku:null), borderColor:colors.selected, backgroundColor:colors.selected, pointRadius:7, showLine:false }] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ min:4.5, max:9.5, ticks:{ callback:v=>f(v) }, grid:{ color:'rgba(96,113,132,.14)' } }, x:{ title:{display:true,text:'Ranking KPwDN'}, grid:{display:false} } }, plugins:{ legend:{position:'bottom', labels:{boxWidth:12,padding:14,color:'#607184'}}, tooltip:{ callbacks:{ label: tooltipLabel } } } } });
+    }
+    async function loadWorkbookBuffer(buffer, fileName) {
+      const workbook = XLSX.read(buffer, { type:'array' });
+      DATA = buildData(workbook);
+      setupOptions('Nasional');
+      setStatus(`Data aktif: ${fileName}`);
+    }
+    document.getElementById('excelInput').addEventListener('change', async event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        setStatus(`Membaca ${file.name}...`);
+        await loadWorkbookBuffer(await file.arrayBuffer(), file.name);
+      } catch (err) {
+        console.error(err);
+        setStatus(`Gagal membaca file: ${err.message}`);
+      }
+    });
+    async function loadDefaultWorkbook() {
+      try {
+        const res = await fetch('layak_IKU.xlsx', { cache:'no-store' });
+        if (!res.ok) throw new Error('File default tidak ditemukan');
+        await loadWorkbookBuffer(await res.arrayBuffer(), 'layak_IKU.xlsx');
+      } catch (err) {
+        setStatus('Upload file Excel untuk mulai.');
+      }
+    }
+    loadDefaultWorkbook();
+  </script>
+</body>
+</html>
